@@ -7,8 +7,8 @@ class Config(object):
     TRAIN_DATASET_PATH = 'train_quad_norm.record'
 
     # Harware Setting
-    NUM_GPU = 2
-    IMAGES_PER_GPU = 4
+    NUM_GPU = 1
+    IMAGES_PER_GPU = 32
 
     # Training Setting
     NUM_TRAINING_STEPS = 10000000
