@@ -56,7 +56,7 @@ with tf.Graph().as_default():
     #################################
     # Opitmize and Gradient Setting #
     #################################
-    optimizer = tf.train.AdamOptimizer(learning_rate)
+    optimizer = get_optimizer(config,learning_rate)
     grads_and_vars = optimizer.compute_gradients(total_loss, tvars)
     # clip gradient
     for i,(gradient,var) in enumerate(grads_and_vars):

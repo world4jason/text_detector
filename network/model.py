@@ -61,7 +61,7 @@ def fpn_graph(resnet_feature_map, config, C2_mode=False):
     P7 is computed by applying ReLU followed by a 3×3 stride-2 conv on P6
     """
     C1, C2, C3, C4, C5 = resnet_feature_map
-    with tf.variable_scope("FPN"):  # TODO: check FPN for ReinaNet
+    with tf.variable_scope("fpn"):  # TODO: check FPN for ReinaNet
         P5_up = conv_layer(C5, 256, kernel_size=1)
         P4_up = upsampling(P5_up, size=(2, 2)) + conv_layer(C4, 256, kernel_size=1)
         P3_up = upsampling(P4_up, size=(2, 2)) + conv_layer(C3, 256, kernel_size=1)
@@ -174,31 +174,6 @@ def smooth_l1_loss_graph(pred_boxes, gt_boxes, weights=1.0):
 
 def focal_loss_graph(preds_cls, gt_cls,
                 config, alpha=0.25, gamma=2.0, name=None, scope=None):
-    """Compute sigmoid focal loss between logits and onehot labels"""
-
-    gt_cls = tf.one_hot(indices=tf.cast(gt_cls,tf.int32), depth=config.NUM_CLASSES) #shape = (val_anchor, 1, num_class)
-
-    preds_cls = tf.nn.sigmoid(preds_cls)            #shape = (val_anchor, num_class)
-    gt_cls = tf.reshape(gt_cls,tf.shape(preds_cls)) #shape: (val_anchor,1, num_class)=>(val_anchor, num_class)
-
-    # cross-entropy -> if y=1 : pt=p / otherwise : pt=1-p
-    predictions_pt = tf.where(tf.equal(gt_cls, 1), preds_cls, 1.0 - preds_cls) #shape = (val_anchor, num_class)
-
-    # clip small value to avoid 0
-    alpha_t = tf.scalar_mul(alpha, tf.ones_like(predictions_pt, dtype=tf.float32)) #shape = (val_anchor, num_class)
-    alpha_t = tf.where(tf.equal(gt_cls, 1.0), alpha_t, 1.0 - alpha_t) #shape = (val_anchor, num_class)
-    gamma_t = tf.scalar_mul(gamma, tf.ones_like(predictions_pt, tf.float32)) #shape = (val_anchor, num_class)
-
-    focal_losses = alpha_t * (-tf.pow(1.0 - predictions_pt, gamma_t) * tf.log(tf.clip_by_value(predictions_pt,1e-10,1.0))) #shape = (val_anchor, num_class)
-
-    focal_losses = tf.reduce_sum(focal_losses, axis=-1) #shape = (val_anchor,)
-    return focal_losses
-
-
-
-
-def focal_loss_graph(preds_cls, gt_cls,
-                config, alpha=0.25, gamma=2.0, name=None, scope=None):
     """Compute sigmoid focal loss between logits and onehot labels
 
     ARGS:
@@ -208,22 +183,23 @@ def focal_loss_graph(preds_cls, gt_cls,
 
 
     """
-    # prepare internal required value (alpha, gamma)
-    condition = tf.equal(tf.reshape(gt_cls,[-1]), 1.0)
-    alpha_t = tf.scalar_mul(alpha, tf.ones_like(preds_cls, dtype=tf.float32)) #shape = (val_anchor, num_class)
-    alpha_t = tf.where(condition, alpha_t, 1.0 - alpha_t)  #shape = (val_anchor, num_class)
-    gamma_t = tf.scalar_mul(gamma, tf.ones_like(preds_cls, tf.float32)) #shape = (val_anchor, num_class)
+    with tf.variable_scope("focal_loss"):
+        # prepare internal required value (alpha, gamma)
+        condition = tf.equal(tf.reshape(gt_cls,[-1]), 1.0)
+        alpha_t = tf.scalar_mul(alpha, tf.ones_like(preds_cls, dtype=tf.float32)) #shape = (val_anchor, num_class)
+        alpha_t = tf.where(condition, alpha_t, 1.0 - alpha_t)  #shape = (val_anchor, num_class)
+        gamma_t = tf.scalar_mul(gamma, tf.ones_like(preds_cls, tf.float32)) #shape = (val_anchor, num_class)
 
-    preds_cls = tf.nn.sigmoid(preds_cls)            #shape = (val_anchor, num_class)
+        preds_cls = tf.nn.sigmoid(preds_cls)            #shape = (val_anchor, num_class)
 
-    # binary cross entropy -> if y=1 : pt=p /
-    #                         otherwise : pt=1-p
-    predictions_pt = tf.where(condition, preds_cls, 1.0 - preds_cls) #shape = (val_anchor, num_class)
+        # binary cross entropy -> if y=1 : pt=p /
+        #                         otherwise : pt=1-p
+        predictions_pt = tf.where(condition, preds_cls, 1.0 - preds_cls) #shape = (val_anchor, num_class)
 
-    # clip to avoid 0
-    focal_losses = alpha_t * (-tf.pow(1.0 - predictions_pt, gamma_t) * tf.log(tf.clip_by_value(predictions_pt,1e-10,1.0))) #shape = (val_anchor, num_class)
+        # clip to avoid 0
+        focal_losses = alpha_t * (-tf.pow(1.0 - predictions_pt, gamma_t) * tf.log(tf.clip_by_value(predictions_pt,1e-10,1.0))) #shape = (val_anchor, num_class)
 
-    focal_losses = tf.reduce_sum(focal_losses, axis=-1) #shape = (val_anchor,)
+        focal_losses = tf.reduce_sum(focal_losses, axis=-1) #shape = (val_anchor,)
     return focal_losses
 ############################################################
 #  TextBoxes++ Network
@@ -363,10 +339,12 @@ class TextBoxesNet():
         ####################################
         # Variables for multi-GPU training #
         ####################################
-        scope = self.scope or self.tune_scope
-        scope = '|'.join(['train_[0-9]+/' + s for s in scope.split('|')])
+        tvars = tf.trainable_variables()
+        if self.config.NUM_GPU>1:
+            scope = self.scope or self.tune_scope
+            scope = '|'.join(['train_[0-9]+/' + s for s in scope.split('|')])
 
-        tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
+            tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
         extra_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
         return loc_loss, cls_loss, tvars, extra_update_ops

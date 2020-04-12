@@ -15,6 +15,8 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.util.tf_export import tf_export
 
+from optimizer import RAdam, Ranger
+
 ############################################################
 #  Tensorflow funtion Porting
 ############################################################
@@ -191,6 +193,37 @@ _SORT_IMPL = {
     'ASCENDING': _ascending_sort,
     'DESCENDING': _descending_sort,
 }
+
+
+############################################################
+#  Optimizer
+############################################################
+
+def get_optimizer(config,learning_rate=None):
+    if learning_rate==None:
+        learning_rate = config.LEARNING_RATE
+
+    if config.OPTIMIZER=="Ranger":
+        return Ranger(learning_rate=learning_rate,
+                            beta1=0.90,
+                            epsilon=1e-8)
+    elif config.OPTIMIZER=="RAdam":
+        return RAdamOptimizer(
+                    learning_rate=learning_rate,
+                    beta1=0.9,
+                    beta2=0.999,
+                    epsilon=1e-6,
+                    decay=0.,
+                    warmup_proportion= 0.1,
+                    weight_decay=0.,
+                    amsgrad=False,
+                )
+    elif config.OPTIMIZER=="Adam":
+        return tf.train.AdamOptimizer(learning_rate)
+    elif config.OPTIMIZER=="Momentum":
+        return tf.train.MomentumOptimizer(learning_rate, config.LEARNING_MOMENTUM)
+    else:
+        return tf.train.GradientDescentOptimizer(learning_rate)
 
 
 
