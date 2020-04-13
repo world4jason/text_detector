@@ -171,7 +171,7 @@ def create_tf_record(output_path, data_dir,image_size):
 
     index = list(range(dataset_size))
     shuffle(index)
-    size = "raw" if image_size[0] or image_size[1] is None else str(image_size)
+    size = "raw" if ((image_size[0] or image_size[1]) is None) else str(image_size)
     print("size:",size)
     # Train_tfrecord
     writer_train = tf.python_io.TFRecordWriter(output_path + "train_all_"+size+".record")

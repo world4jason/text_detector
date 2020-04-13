@@ -15,7 +15,14 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.util.tf_export import tf_export
 
-from optimizer import RAdam, Ranger
+import os
+import sys
+# Root directory of the project
+ROOT_DIR = os.path.abspath("../../")
+# find root dir
+sys.path.append(ROOT_DIR)
+
+from network.optimizer import RAdam, Ranger
 
 ############################################################
 #  Tensorflow funtion Porting
@@ -199,7 +206,7 @@ _SORT_IMPL = {
 #  Optimizer
 ############################################################
 
-def get_optimizer(config,learning_rate=None):
+def get_optimizer(config, learning_rate=None):
     if learning_rate==None:
         learning_rate = config.LEARNING_RATE
 
@@ -233,30 +240,36 @@ def get_optimizer(config,learning_rate=None):
 def gen_anchor_boxes(image_width,image_height,
                      anchor_vertical_step,
                      anchor_horizontal_step,
-                     backbone_stride,
+                     feature_stride,
                      anchor_area,
                      aspect_ratios):
     """
+    Generate anchors of sinlgle layer
     ARGS:
-
-
+        - image_width : int, image width of input image
+        - image_height : int, image height of input image
+        - anchor_vertical_step : float, vertical offset in anchor grid setting
+        - anchor_horizontal_step : float, horizontal offset in anchor grid setting
+        - feature_stride : int, output scale from fpn
+        - anchor_area : int array, an array of anchor size in pixel
+        - aspect_ratios : float array, an array of anchor ratio
     RETURN :
-
+        shape=> np.array(num_anchor_a_layer,12)
     """
     scales = np.tile(np.array(anchor_area),len(aspect_ratios)).flatten()
     ratios = aspect_ratios
 
     # normal coord
     # center x, center y
-    x = (np.arange(0, image_width/backbone_stride,anchor_horizontal_step)+0.5)*backbone_stride
-    y = (np.arange(0, image_height/backbone_stride,anchor_vertical_step)+0.5)*backbone_stride
+    x = (np.arange(0, image_width/feature_stride,anchor_horizontal_step)+0.5)*feature_stride
+    y = (np.arange(0, image_height/feature_stride,anchor_vertical_step)+0.5)*feature_stride
     cx, cy = np.meshgrid(x,y)
 
     # width, height
     heights = scales / np.sqrt(ratios)
     widths  = scales * np.sqrt(ratios)
-    heights_set,cy_set = np.meshgrid( heights,cy)
-    widths_set,cx_set  = np.meshgrid( widths,cx)
+    heights_set,cy_set = np.meshgrid(heights,cy)
+    widths_set,cx_set  = np.meshgrid(widths,cx)
 
     # quad coord
     # top-left clockwise
@@ -284,59 +297,6 @@ def gen_anchor_boxes(image_width,image_height,
                           np.expand_dims(heights_set.flatten(), axis=-1),
                           ),axis=-1)
 
-def _pyramid_gen_anchor_boxes_v1(image_width,
-                            image_height,
-                            ANCHOR_VERTICAL_STEP,
-                            ANCHOR_HORIZON_STEP,
-                            BACKBONE_STRIDES,
-                            ANCHOR_AREAS,
-                            ASPECT_RATIOS):
-    """
-    ARGS:
-
-
-    RETURN :
-        pyramid_anchors : shape =>[ FEATURE_STRIDES, num_anchor_per_feature_stride,num_anchors, 12]
-    """
-
-    pyramid_anchors = []
-    for BACKBONE_STRIDE,ANCHOR_AREA in zip(BACKBONE_STRIDES,ANCHOR_AREAS):
-        pyramid_anchors.append(gen_anchor_boxes(image_width,
-                                                 image_height,
-                                                 ANCHOR_VERTICAL_STEP,
-                                                 ANCHOR_HORIZON_STEP,
-                                                 BACKBONE_STRIDE,
-                                                 ANCHOR_AREA,
-                                                 ASPECT_RATIOS))
-    return pyramid_anchors
-
-def _pyramid_gen_anchor_boxes_v2(image_width,
-                            image_height,
-                            ANCHOR_VERTICAL_STEP,
-                            ANCHOR_HORIZON_STEP,
-                            FEATURE_STRIDES,
-                            ANCHOR_AREAS,
-                            ASPECT_RATIOS):
-    """
-    ARGS:
-
-
-    RETURN :
-        pyramid_anchors : shape =>[ FEATURE_STRIDES, num_anchor ,num_anchors, 12]
-    """
-
-    pyramid_anchors = np.array([])
-    for FEATURE_STRIDE,ANCHOR_AREA in zip(FEATURE_STRIDES,ANCHOR_AREAS):
-        pyramid_anchors = np.append(pyramid_anchors,gen_anchor_boxes(image_width,
-                                                 image_height,
-                                                 ANCHOR_VERTICAL_STEP,
-                                                 ANCHOR_HORIZON_STEP,
-                                                 FEATURE_STRIDE,
-                                                 ANCHOR_AREA,
-                                                 ASPECT_RATIOS))
-
-    return np.reshape(pyramid_anchors,(-1,12))
-
 def pyramid_gen_anchor_boxes(image_width,
                             image_height,
                             ANCHOR_VERTICAL_STEP,
@@ -346,25 +306,43 @@ def pyramid_gen_anchor_boxes(image_width,
                             ASPECT_RATIOS,
                             dense=True):
     """
-    v1 is for debug purpose
-    v2 is for training and inference purpose
+    Dense is for training and inference purpose, another is for debug purpose
+    ARGS:
+        - image_width : int, image width of input image
+        - image_height : int, image height of input image
+        - ANCHOR_VERTICAL_STEP : float, vertical offset in anchor grid setting
+        - ANCHOR_HORIZON_STEP : float, horizontal offset in anchor grid setting
+        - FEATURE_STRIDES : int array, an array of output scale from fpn
+        - ANCHOR_AREAS : int array, an array of anchor size in pixel
+        - aspect_rASPECT_RATIOSatios : float array, an array of anchor ratio
+        - dense : bool, False when debug mode
+    RETURN :
+        shape=> np.array(num_anchor, 12)
     """
     if dense:
-        return _pyramid_gen_anchor_boxes_v2(image_width,
-                            image_height,
-                            ANCHOR_VERTICAL_STEP,
-                            ANCHOR_HORIZON_STEP,
-                            FEATURE_STRIDES,
-                            ANCHOR_AREAS,
-                            ASPECT_RATIOS)
+        pyramid_anchors = np.array([])
+        for FEATURE_STRIDE,ANCHOR_AREA in zip(FEATURE_STRIDES,ANCHOR_AREAS):
+            pyramid_anchors = np.append(pyramid_anchors,gen_anchor_boxes(image_width,
+                                                    image_height,
+                                                    ANCHOR_VERTICAL_STEP,
+                                                    ANCHOR_HORIZON_STEP,
+                                                    FEATURE_STRIDE,
+                                                    ANCHOR_AREA,
+                                                    ASPECT_RATIOS))
 
-    return _pyramid_gen_anchor_boxes_v1(image_width,
-                            image_height,
-                            ANCHOR_VERTICAL_STEP,
-                            ANCHOR_HORIZON_STEP,
-                            FEATURE_STRIDES,
-                            ANCHOR_AREAS,
-                            ASPECT_RATIOS)
+        return np.reshape(pyramid_anchors,(-1,12))
+
+    pyramid_anchors = []
+    for FEATURE_STRIDE,ANCHOR_AREA in zip(FEATURE_STRIDES,ANCHOR_AREAS):
+        pyramid_anchors.append(gen_anchor_boxes(image_width,
+                                                 image_height,
+                                                 ANCHOR_VERTICAL_STEP,
+                                                 ANCHOR_HORIZON_STEP,
+                                                 FEATURE_STRIDE,
+                                                 ANCHOR_AREA,
+                                                 ASPECT_RATIOS))
+    return pyramid_anchors
+
 ############################################################
 #  Bounding Boxes Encode
 ############################################################
@@ -391,7 +369,7 @@ def center2point(center_x, center_y, width, height):
     """
     return tf.truediv(center_x - width , 2.), tf.truediv(center_y - height, 2.), tf.truediv(center_x + width , 2.),tf.truediv(center_y + height, 2.)
 
-def _encode_v1(anchor_list, gt_data_list, config):
+def _encode_v1(anchor_list, gt_box_list,gt_label, config):
     """
     1. Calculate IoU
     2. Match Strategy
@@ -407,9 +385,8 @@ def _encode_v1(anchor_list, gt_data_list, config):
 
     # ground truth data order
     # gt_x0,gt_y0,gt_x1,gt_y1,gt_x2,gt_y2,gt_x3,gt_y3,gt_cx,gt_cy,gt_w,gt_h
-    tf_gt = scale2coord(gt_data_list[:12], (image_width, image_height))
-    gt_xmin,gt_ymin,gt_xmax,gt_ymax = center2point(tf_gt[0],tf_gt[1],tf_gt[2],tf_gt[3])
-    gt_label = gt_data_list[-1]
+    tf_gt = scale2coord(gt_box_list, (image_width, image_height))
+    gt_xmin,gt_ymin,gt_xmax,gt_ymax = center2point(tf_gt[8],tf_gt[9],tf_gt[10],tf_gt[11])
 
     # anchors_list
     # shape=(num_feature_maps, anchor_points, 12+1)
@@ -419,7 +396,7 @@ def _encode_v1(anchor_list, gt_data_list, config):
         # anchor bbox data order
         # a_x0,a_y0,a_x1,a_y1,a_x2,a_y2,a_x3,a_y3,a_cx,a_cy,a_w,a_h
         tf_anchors = tf.cast(tf.transpose(anchor_list[index]),tf.float32)
-        a_xmin,a_ymin,a_xmax,a_ymax = center2point(tf_anchors[0],tf_anchors[1],tf_anchors[2],tf_anchors[3])
+        a_xmin,a_ymin,a_xmax,a_ymax = center2point(tf_anchors[8],tf_anchors[9],tf_anchors[10],tf_anchors[11])
 
         #################
         #               #
@@ -470,13 +447,16 @@ def _encode_v1(anchor_list, gt_data_list, config):
         # Encoding for Rectangle boxes
         loc_rect_xy = (gt_rect_boxes[:, :2] - tf_anchors_transpose[:, 8:10]) / tf_anchors_transpose[:,10:] #shape=[num_anchor, 2]
         loc_rect_wh = tf.log(gt_rect_boxes[:, :2] / (tf_anchors_transpose[:, 10:])) #shape=[num_anchor, 2]
+        loc_rect_xy = (loc_rect_xy / config.RECT_BBOX_XY_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_rect_xy
+        loc_rect_wh = (loc_rect_wh / config.RECT_BBOX_WH_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_rect_wh
 
         #  Encoding for Quad boxes
         anchor_boxes_wh = tf.tile(tf_anchors_transpose[:, 10:], [1, 4]) #shape=[num_anchor, 8]
-        loc_quad_xy = (gt_quad_boxes -  tf_anchors_transpose[:, :8]) / anchor_boxes_wh #shape=[num_anchor, 8]
+        loc_quad_xy = (gt_quad_boxes -  tf_anchors_transpose[:, :8]) / anchor_boxes_wh  #shape=[num_anchor, 8]
+        loc_quad_xy = (loc_quad_xy / config.QUAD_BBOX_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_quad_xy
 
         # calc for class
-        cls_targets = tf.gather(tf.one_hot(gt_label, config.NUM_CLASSES), max_ids) # shape=[num_anchor, num_classes=2]
+        cls_targets = tf.gather(tf.one_hot(tf.transpose(gt_label), config.NUM_CLASSES), max_ids) # shape=[num_anchor, num_classes=2]
 
         # iou > THRESHOLD :keep(1)
         # iou < THRESHOLD : background(0)
@@ -500,31 +480,27 @@ def _encode_v1(anchor_list, gt_data_list, config):
 
     return targets_list
 
-def _encode_v2(anchor_list, gt_data_list, config):
+def _encode_v2(anchor_list, gt_box_list, gt_label, config):
     """
     1. Calculate IoU
     2. Match Strategy
     3. Encode
 
     ARGS:
-        anchor_list:
-            shape=>[num_feature_maps,num_anchors_on_each_feature_maps,12]
-        gt_data_list:
-            shape=>[num_gt,13]
-            13=> x0_set,y0_set,x1_set,y1_set,x2_set,y2_set,x3_set,y3_set,cx_set,cy_set,w_set,h_set,label
-
-    RETURN :
+        - anchor_list : np.array([num_feature_maps, num_anchors_on_each_feature_maps,12])
+        - gt_box_list:
+            shape=>Tensor([num_gt, 12])
+            12=> x0_set,y0_set,x1_set,y1_set,x2_set,y2_set,x3_set,y3_set,cx_set,cy_set,w_set,h_set
+        - gt_label:Tensor([num_gt, 1])
+    RETURN : Paired Data
 
     """
     image_width, image_height = config.IMAGE_SHAPE
-    #tf_gt = scale2coord(gt_data_list, (image_width, image_height))
 
     # ground truth data order
     # gt_x0,gt_y0,gt_x1,gt_y1,gt_x2,gt_y2,gt_x3,gt_y3,gt_cx,gt_cy,gt_w,gt_h
-    #tf_gt = tf.cast(tf.convert_to_tensor(np.array(scaled_data_list)),tf.float32)
-    tf_gt = scale2coord(gt_data_list[:12], (image_width, image_height))
+    tf_gt = scale2coord(gt_box_list, (image_width, image_height))
     gt_xmin,gt_ymin,gt_xmax,gt_ymax = center2point(tf_gt[8],tf_gt[9],tf_gt[10],tf_gt[11])
-    gt_label = gt_data_list[-1]
 
     # anchors_list
     # shape=(num_anchos, 12)
@@ -576,19 +552,27 @@ def _encode_v2(anchor_list, gt_data_list, config):
     gt_quad_boxes = tf.gather(gt_quad_set, max_ids) #shape=[num_anchor, 8]
     gt_rect_boxes = tf.gather(gt_rect_set, max_ids) #shape=[num_anchor, 4]
 
+    ###########
+    #         #
+    # Encode  #
+    #         #
+    ###########
     # offset calculation
     tf_anchors_transpose = tf.transpose(tf_anchors)
 
     # Encoding for Rectangle boxes
     loc_rect_xy = (gt_rect_boxes[:, :2] - tf_anchors_transpose[:, 8:10]) / tf_anchors_transpose[:,10:] #shape=[num_anchor, 2]
     loc_rect_wh = tf.log(gt_rect_boxes[:, :2] / (tf_anchors_transpose[:, 10:])) #shape=[num_anchor, 2]
+    loc_rect_xy = (loc_rect_xy / config.RECT_BBOX_XY_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_rect_xy
+    loc_rect_wh = (loc_rect_wh / config.RECT_BBOX_WH_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_rect_wh
 
     #  Encoding for Quad boxes
     anchor_boxes_wh = tf.tile(tf_anchors_transpose[:, 10:], [1, 4]) #shape=[num_anchor, 8]
-    loc_quad_xy = (gt_quad_boxes -  tf_anchors_transpose[:, :8]) / anchor_boxes_wh #shape=[num_anchor, 8]
+    loc_quad_xy = (gt_quad_boxes -  tf_anchors_transpose[:, :8]) / anchor_boxes_wh  #shape=[num_anchor, 8]
+    loc_quad_xy = (loc_quad_xy / config.QUAD_BBOX_PRIOR_VARIANCE) if config.PRIOR_VARIANCE else loc_quad_xy
 
     # calc for class
-    cls_targets = tf.gather(tf.cast(gt_label,tf.float32), max_ids)
+    cls_targets = tf.gather(tf.cast(tf.transpose(gt_label),tf.float32), max_ids)
 
     # iou > THRESHOLD : keep(1)
     # iou < THRESHOLD : background(0)
@@ -605,16 +589,16 @@ def _encode_v2(anchor_list, gt_data_list, config):
     return tf.concat([loc_quad_xy,
                      loc_rect_xy,
                      loc_rect_wh,
-                     tf.expand_dims(cls_targets, 1)], 1) # shape=[num_anchor, 12+1]
+                     cls_targets], 1) # shape=[num_anchor, 12+1]
 
-def encoder(anchor_list, gt_data_list, config, dense=True):
+def encoder(anchor_list, gt_box_list, gt_label_list,config, dense=True):
     """
     v1 is for debug purpose
     v2 is for training and inference purpose
     """
     if dense:
-        return _encode_v2(anchor_list, gt_data_list, config)
-    return _encode_v1(anchor_list, gt_data_list, config)
+        return _encode_v2(anchor_list, gt_box_list, gt_label_list, config)
+    return _encode_v1(anchor_list, gt_box_list, gt_label_list, config)
 
 
 ############################################################
@@ -651,15 +635,17 @@ def polynms(dets, thresh):
         order = order[inds + 1]   # cause len(iou)==len(order)-1
     return keep
 
-def decoder(anchor_list, pred_list, config):
+def decoder(anchor_list, logists, config):
     """
     ARGS:
-        anchor_list:
-        logits_output_list
-
+        - anchor_list: np.array(num_anchor, 12)
+        - logists :
+            - loc_pred : Tensor(num_anchor,12)
+            - cls_pred : Tensor(num_anchor,2)
     RETURN:
 
     """
+    loc_pred, cls_pred = logists
     image_width, image_height = config.IMAGE_SHAPE
     tf_anchors = tf.cast(anchor_list,tf.float32)
 
@@ -674,10 +660,9 @@ def decoder(anchor_list, pred_list, config):
     # hw  =>[10:]
 
     # Get predict set
-    loc_quad = pred_list[:,:8]
-    loc_xy = pred_list[:,8:10]
-    loc_wh = pred_list[:,10:12]
-    cls_pred = pred_list[:,12:]
+    loc_quad = loc_pred[:,:8]
+    loc_xy = loc_pred[:,8:10]
+    loc_wh = loc_pred[:,10:12]
 
     # Decoding for Rectangle boxes
     rect_xy = loc_xy * tf_anchors[:,10:] + tf_anchors[:, 8:10] #shape=[num_anchor, 2]
@@ -728,7 +713,7 @@ def decoder(anchor_list, pred_list, config):
 
     # Casacade Nox max suppression
     # Step 1: Normal non_max
-    # Step 2: Polygon non_max
+    # Step 2: Polygon non_max (Cannot process in tf pipline)
     # change boxes format [x,y,w,h]=>[x1,y1,x2,y2]
 
     # step 1
@@ -746,7 +731,6 @@ def decoder(anchor_list, pred_list, config):
     score = tf.expand_dims(score,1)
     labels = tf.cast(tf.expand_dims(labels,1),tf.float32)
 
-    #return quad_boxes,rect_boxes,score,labels
     return tf.concat([quad_boxes,
                       rect_boxes,
                       score,
@@ -755,9 +739,11 @@ def decoder(anchor_list, pred_list, config):
 
 def batch_decode(anchor_list,logists,config):
     """
-
     ARGS:
-
+        - anchor_list: np.array(num_anchor, 12)
+        - logists :
+            - loc_pred : Tensor(batch,num_anchor,12)
+            - cls_pred : Tensor(batch,num_anchor,2)
     RETURN:
 
     """
@@ -838,9 +824,6 @@ def compute_ap( detect_data, gt_bbox, iou_threshold=0.5):
     precision = tf.divide(tp_cum,tf.range(1.,tf.cast(tf.add(tf.shape(iou_max_value)[0],1),tf.float32),1))
     recall = tf.divide(tp_cum,tf.fill(tf.shape(iou_max_value),
                                       tf.cast(tf.shape(gt_bbox)[0],tf.float32)))
-
-
-
     #######################################
     #  Mean Average Precision Calculation #
     #######################################

@@ -21,18 +21,27 @@ from network.config import Config
 from network import augment
 from network.model import TextBoxesNet
 
+FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_string('train_dataset', '/home/world4jason/text_detection/train_data/SynthText/tfrecord/train_quad_norm.record',
+                           """Path to training dataset (.record)""")
+tf.app.flags.DEFINE_string('valid_dataset','',
+                          """Path to validation dataset (.record)""")
 
 
 # main
 with tf.Graph().as_default():
     config = Config()
+    config.TRAIN_DATASET_PATH = FLAGS.train_dataset
+    config.VALIDATIO_DATASET_PATH = FLAGS.valid_dataset
+    config.display()
+
     model = TextBoxesNet(config)
 
-    batch_image, batch_loc, batch_cls, batch_gt_boxes = model.data_generator(config.TRAIN_DATASET_PATH, config.BATCH_SIZE, augment=False)
+    batch_image, batch_loc, batch_cls, batch_gt_boxes, batch_gt_labels = model.data_generator(config.TRAIN_DATASET_PATH, config.BATCH_SIZE, config.AUGMENT)
     with tf.variable_scope('{}_{}'.format('train', 0)) as scope:
         logits = model.forward(batch_image)
-        loc_preds = logits[:,:,:12] #(batch, num_anchor, 2)
-        cls_preds = logits[:,:,12:] #(batch, num_anchor, 12)
+
+        loc_preds, cls_preds = logits # (batch, num_anchor, 12),(batch, num_anchor, 2)
 
         loc_loss, cls_loss, tvars, extra_update_ops = model.calc_loss([loc_preds, cls_preds], [batch_loc, batch_cls])
 
@@ -111,7 +120,7 @@ with tf.Graph().as_default():
             step_loc_loss, step_cls_loss, _ = sess.run([loc_loss, cls_loss, train_op])
             print('STEP : %d\tTRAIN_TOTAL_LOSS : %.8f\tTRAIN_LOC_LOSS : %.8f\tTRAIN_CLS_LOSS : %.5f'
                     % (step, step_loc_loss + step_cls_loss, step_loc_loss, step_cls_loss),end='\r')
-            if step%100==0:
+            if step%config.SUMMARY_STEPS==0:
                 mAP_,mIoU_ = sess.run([batch_mAP,batch_mIoU])
                 print('STEP : %d\tmAP 0.5:%.3f\tmIoU:%.3f'%(step,mAP_,mIoU_))
 
