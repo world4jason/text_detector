@@ -291,7 +291,7 @@ class TextBoxesNet():
             anchor_list=dense_anchor_list
 
         for i in range(self.config.IMAGES_PER_GPU):
-            decode_data = decoder(self.anchor_list, [loc_output[i], cls_output[i]], self.config)
+            decode_data = decoder(self.anchor_list, loc_output[i], cls_output[i], self.config)
             decode_data_list.append(decode_data)
         return decode_data_list
 

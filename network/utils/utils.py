@@ -635,17 +635,15 @@ def polynms(dets, thresh):
         order = order[inds + 1]   # cause len(iou)==len(order)-1
     return keep
 
-def decoder(anchor_list, logists, config):
+def decoder(anchor_list, loc_pred, cls_pred, config):
     """
     ARGS:
         - anchor_list: np.array(num_anchor, 12)
-        - logists :
-            - loc_pred : Tensor(num_anchor,12)
-            - cls_pred : Tensor(num_anchor,2)
+        - loc_pred : Tensor(num_anchor,12)
+        - cls_pred : Tensor(num_anchor,2)
     RETURN:
 
     """
-    loc_pred, cls_pred = logists
     image_width, image_height = config.IMAGE_SHAPE
     tf_anchors = tf.cast(anchor_list,tf.float32)
 
@@ -747,16 +745,18 @@ def batch_decode(anchor_list,logists,config):
     RETURN:
 
     """
+    loc_pred, cls_pred = logists
+
     decode_data_list = []
      # anchor_list shape normalization
     if np.array(anchor_list).ndim!=2:
         dense_anchor_list = anchor_list[0]
         for i in range(1,len(anchor_list)):
-            dense_anchor_list = np.vstack((dense_anchor_list,anchor_list[i]))
+            dense_anchor_list = np.vstack((dense_anchor_list, anchor_list[i]))
         anchor_list=dense_anchor_list
 
     for i in range(config.BATCH_SIZE):
-        decode_data = decode(anchor_list, logists[i], config)
+        decode_data = decode(anchor_list, loc_preds[i], cls_preds[i], config)
         decode_data_list.append(decode_data)
 
     return decode_data_list
@@ -797,7 +797,7 @@ def compute_iou(detect_data, gt_data):
     iou  = tf.where(iou_condition, condition_a, condition_b) #shape=[num_anchor,num_gt]
     return iou
 
-def compute_ap( detect_data, gt_bbox, iou_threshold=0.5):
+def compute_ap(detect_data, gt_bbox, iou_threshold=0.5):
     iou =  compute_iou(detect_data, gt_bbox)
     iou_max_value = tf.reduce_max(iou,axis=1)
     iou_idx = tf.argmax(iou,axis=1)
