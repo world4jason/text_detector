@@ -22,7 +22,7 @@ from network import augment
 from network.model import TextBoxesNet
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('train_dataset', '/home/world4jason/text_detection/train_data/SynthText/tfrecord/train_quad_norm.record',
+tf.app.flags.DEFINE_string('train_dataset', '',
                            """Path to training dataset (.record)""")
 tf.app.flags.DEFINE_string('valid_dataset','',
                           """Path to validation dataset (.record)""")
@@ -73,17 +73,6 @@ with tf.Graph().as_default():
             grads_and_vars[i] = (tf.clip_by_norm(gradient,config.CLIP_NORM),var)
     train_op = optimizer.apply_gradients(grads_and_vars)
 
-    ##########################
-    # Decode and Compute IoU #
-    ##########################
-    decode_data_list = model.decode(logits)
-    mAP = []
-    mIoU = []
-    for i in range(config.IMAGES_PER_GPU):
-        mAP.append(compute_ap(decode_data_list[i],batch_gt_boxes[i],0.5))
-        mIoU.append(tf.reduce_max(compute_iou(decode_data_list[i], batch_gt_boxes[i]),axis=1))
-    batch_mAP = tf.reduce_mean(mAP)
-    batch_mIoU = tf.reduce_mean(mIoU)
 
     session_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
 
@@ -107,7 +96,6 @@ with tf.Graph().as_default():
     with tf.train.MonitoredTrainingSession(checkpoint_dir=config.OUTPUT_LOGS,
                                                 scaffold=scaffold,
                                                 config=session_config,
-                                                #save_checkpoint_steps=FLAGS.valid_steps,
                                                 save_checkpoint_secs=1800,  #None,
                                                 save_summaries_steps=config.SUMMARY_STEPS,
                                                 save_summaries_secs=None,
@@ -120,8 +108,5 @@ with tf.Graph().as_default():
             step_loc_loss, step_cls_loss, _ = sess.run([loc_loss, cls_loss, train_op])
             print('STEP : %d\tTRAIN_TOTAL_LOSS : %.8f\tTRAIN_LOC_LOSS : %.8f\tTRAIN_CLS_LOSS : %.5f'
                     % (step, step_loc_loss + step_cls_loss, step_loc_loss, step_cls_loss),end='\r')
-            if step%config.SUMMARY_STEPS==0:
-                mAP_,mIoU_ = sess.run([batch_mAP,batch_mIoU])
-                print('STEP : %d\tmAP 0.5:%.3f\tmIoU:%.3f'%(step,mAP_,mIoU_))
 
         print("Optimization Finished!")
