@@ -226,7 +226,7 @@ class TextBoxesNet():
                                                 self.config.ANCHOR_HORIZON_STEP,
                                                 self.config.FEATURE_STRIDES,
                                                 self.config.ANCHOR_AREAS,
-                                                self.config.ASPECT_RATIOS)
+                                                self.config.ANCHOR_RATIOS)
         self.slim_backbones = ["slim_resnet_v1_50"]
     def forward(self, image, **kwargs):
         """Forwarding and get logits output

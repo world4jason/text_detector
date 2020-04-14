@@ -242,7 +242,7 @@ def gen_anchor_boxes(image_width,image_height,
                      anchor_horizontal_step,
                      feature_stride,
                      anchor_area,
-                     aspect_ratios):
+                     anchor_ratios):
     """
     Generate anchors of sinlgle layer
     ARGS:
@@ -252,12 +252,12 @@ def gen_anchor_boxes(image_width,image_height,
         - anchor_horizontal_step : float, horizontal offset in anchor grid setting
         - feature_stride : int, output scale from fpn
         - anchor_area : int array, an array of anchor size in pixel
-        - aspect_ratios : float array, an array of anchor ratio
+        - anchor_ratios : float array, an array of anchor ratio
     RETURN :
         shape=> np.array(num_anchor_a_layer,12)
     """
-    scales = np.tile(np.array(anchor_area),len(aspect_ratios)).flatten()
-    ratios = aspect_ratios
+    scales = np.tile(np.array(anchor_area),len(anchor_ratios)).flatten()
+    ratios = anchor_ratios
 
     # normal coord
     # center x, center y
@@ -303,7 +303,7 @@ def pyramid_gen_anchor_boxes(image_width,
                             ANCHOR_HORIZON_STEP,
                             FEATURE_STRIDES,
                             ANCHOR_AREAS,
-                            ASPECT_RATIOS,
+                            ANCHOR_RATIOS,
                             dense=True):
     """
     Dense is for training and inference purpose, another is for debug purpose
@@ -314,7 +314,7 @@ def pyramid_gen_anchor_boxes(image_width,
         - ANCHOR_HORIZON_STEP : float, horizontal offset in anchor grid setting
         - FEATURE_STRIDES : int array, an array of output scale from fpn
         - ANCHOR_AREAS : int array, an array of anchor size in pixel
-        - aspect_rASPECT_RATIOSatios : float array, an array of anchor ratio
+        - anchor_ratios : float array, an array of anchor ratio
         - dense : bool, False when debug mode
     RETURN :
         shape=> np.array(num_anchor, 12)
@@ -328,7 +328,7 @@ def pyramid_gen_anchor_boxes(image_width,
                                                     ANCHOR_HORIZON_STEP,
                                                     FEATURE_STRIDE,
                                                     ANCHOR_AREA,
-                                                    ASPECT_RATIOS))
+                                                    ANCHOR_RATIOS))
 
         return np.reshape(pyramid_anchors,(-1,12))
 
@@ -340,7 +340,7 @@ def pyramid_gen_anchor_boxes(image_width,
                                                  ANCHOR_HORIZON_STEP,
                                                  FEATURE_STRIDE,
                                                  ANCHOR_AREA,
-                                                 ASPECT_RATIOS))
+                                                 ANCHOR_RATIOS))
     return pyramid_anchors
 
 ############################################################

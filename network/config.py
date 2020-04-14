@@ -17,7 +17,7 @@ class Config(object):
     NUM_GPU = 1
     # Number of images to train with on each GPU. A 12GB GPU can typically
     # handle 2 images of 1024x1024px.
-    IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 8
 
     ####################
     # Training Setting #
@@ -86,7 +86,7 @@ class Config(object):
 
     # Ratios of anchors at each cell (width/height)
     # A value of 1 represents a square anchor, and 0.5 is a wide anchor
-    ASPECT_RATIOS = [1., 2., 3., 5., 1./2., 1./3., 1./5.]
+    ANCHOR_RATIOS = [1., 2., 3., 5., 1./2., 1./3., 1./5.]
     # Length of square anchor side in pixels
     ANCHOR_AREAS = [32, 64, 128, 256, 512] #[16,32,64,128,256]
 
@@ -134,7 +134,7 @@ class Config(object):
         self.BATCH_SIZE = self.NUM_GPU*self.IMAGES_PER_GPU
 
         # Effective anchor grid
-        self.NUM_ANCHOR_PER_GRID = len(self.ASPECT_RATIOS)*(1/self.ANCHOR_VERTICAL_STEP)*(1/self.ANCHOR_HORIZON_STEP)
+        self.NUM_ANCHOR_PER_GRID = len(self.ANCHOR_RATIOS)*(1/self.ANCHOR_VERTICAL_STEP)*(1/self.ANCHOR_HORIZON_STEP)
 
         #min_after_dequeue + (num_threads + a small safety margin) * batch_size
 
