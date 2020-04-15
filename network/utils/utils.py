@@ -664,16 +664,24 @@ def decoder(anchor_list, loc_pred, cls_pred, config):
 
     # Decoding for Rectangle boxes
     rect_xy = loc_xy * tf_anchors[:,10:] + tf_anchors[:, 8:10] #shape=[num_anchor, 2]
-    rect_wh = tf.exp(loc_wh) * tf_anchors[:,10:] #shape=[num_anchor, 2]
+    rect_wh = tf.exp(loc_wh) * tf_anchors[:, 10:]  #shape=[num_anchor, 2]
+
+    # prior variance decode
+    rect_xy = rect_xy * config.RECT_BBOX_XY_PRIOR_VARIANCE if config.PRIOR_VARIANCE else rect_xy
+    rect_wh = rect_wh * config.RECT_BBOX_WH_PRIOR_VARIANCE if config.PRIOR_VARIANCE else rect_wh
+
     # Prepare format for tf.non_max
-    rect_boxes = tf.concat([rect_xy-rect_wh/2, rect_xy+rect_wh/2], axis=1)  # shape=[anchors,4]
-    rect_boxes_x = tf.clip_by_value(rect_boxes[:,::2], 0, image_width)  #shape=[anchor, 4]
-    rect_boxes_y = tf.clip_by_value(rect_boxes[:,1::2], 0, image_height)#shape=[anchor, 4]
+    # cx, cy, w, h ==> xmin, ymin, xmax, ymax
+    rect_boxes = tf.concat([rect_xy - rect_wh / 2, rect_xy + rect_wh / 2], axis=1)  # shape=[anchors,4]
+    rect_boxes_x = tf.clip_by_value(rect_boxes[:,::2], 0, image_width)   #shape=[anchor, 4]
+    rect_boxes_y = tf.clip_by_value(rect_boxes[:,1::2], 0, image_height) #shape=[anchor, 4]
     rect_boxes = tf.stack([rect_boxes_x, rect_boxes_y], axis=-1) #shape=[anchor, 2, 2]
     rect_boxes = tf.reshape(rect_boxes,(-1,4)) #shape=[anchor, 4]
 
     # Decoding for Quad boxes
     quad_boxes = tf_anchors[:, :8] + tf.tile(tf_anchors[:, 10:], [1, 4]) * loc_quad  #shape=[anchor, 8]
+    quad_boxes = quad_boxes*config.QUAD_BBOX_PRIOR_VARIANCE if config.PRIOR_VARIANCE else quad_boxes
+
     quad_boxes_x = tf.clip_by_value(quad_boxes[:,::2], 0, image_width)  #shape=[anchor, 4]
     quad_boxes_y = tf.clip_by_value(quad_boxes[:,1::2], 0, image_height)#shape=[anchor, 4]
     quad_boxes = tf.stack([quad_boxes_x, quad_boxes_y], axis=-1) #shape=[anchor, 4, 2]
@@ -712,7 +720,6 @@ def decoder(anchor_list, loc_pred, cls_pred, config):
     # Casacade Nox max suppression
     # Step 1: Normal non_max
     # Step 2: Polygon non_max (Cannot process in tf pipline)
-    # change boxes format [x,y,w,h]=>[x1,y1,x2,y2]
 
     # step 1
     keep_indice = tf.image.non_max_suppression(rect_boxes,
