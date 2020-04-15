@@ -201,6 +201,21 @@ _SORT_IMPL = {
     'DESCENDING': _descending_sort,
 }
 
+############################################################
+#  Load Pretrained Model
+############################################################
+
+def _get_init_pretrained(model_path):
+    """Return lambda for reading pretrained initial model"""
+    if not os.path.exists(model_path):
+        print("model_weight not exist.")
+        return None
+    saver_reader = tf.train.Saver(tf.global_variables())
+
+    def init_fn(scaffold, sess):
+        return saver_reader.restore(sess, model_path)
+    return init_fn
+
 
 ############################################################
 #  Optimizer

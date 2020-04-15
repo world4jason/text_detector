@@ -25,14 +25,16 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('train_dataset', '',
                            """Path to training dataset (.record)""")
 tf.app.flags.DEFINE_string('valid_dataset','',
-                          """Path to validation dataset (.record)""")
-
+                           """Path to validation dataset (.record)""")
+tf.app.flags.DEFINE_string('pretrained_model_path', '',
+                           """Path to pretrain model (.ckpt)""")
 
 # main
 with tf.Graph().as_default():
     config = Config()
     config.TRAIN_DATASET_PATH = FLAGS.train_dataset
     config.VALIDATIO_DATASET_PATH = FLAGS.valid_dataset
+    config.PRETRAINED_MODEL_PATH = FLAGS.pretrained_model_path
     config.display()
 
     model = TextBoxesNet(config)
@@ -90,7 +92,8 @@ with tf.Graph().as_default():
 
     scaffold = tf.train.Scaffold(saver=saver,
                                  init_op=init_op,
-                                 summary_op=summary_op)
+                                 summary_op=summary_op,
+                                 init_fn=_get_init_pretrained(config.PRETRAINED_MODEL_PATH))
     valid_saver = tf.train.Saver(tf.global_variables(),max_to_keep=10)
 
     with tf.train.MonitoredTrainingSession(checkpoint_dir=config.OUTPUT_LOGS,

@@ -51,10 +51,11 @@ class Config(object):
 
     TRAINABLE_SCOPE = "resnet_backbone|fpn|task_head"
 
-
     ###################
     # Network Setting #
     ###################
+    # Pretrain
+    PRETRAINED_MODEL_PATH = ""
     # Image Setting
     IMAGE_SHAPE = (640,640)
     MEAN_PIXEL = np.array([123.7, 116.8, 103.9])
