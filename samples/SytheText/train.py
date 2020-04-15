@@ -93,7 +93,7 @@ with tf.Graph().as_default():
     scaffold = tf.train.Scaffold(saver=saver,
                                  init_op=init_op,
                                  summary_op=summary_op,
-                                 init_fn=_get_init_pretrained(config.PRETRAINED_MODEL_PATH))
+                                 init_fn=get_init_pretrained(config.PRETRAINED_MODEL_PATH))
     valid_saver = tf.train.Saver(tf.global_variables(),max_to_keep=10)
 
     with tf.train.MonitoredTrainingSession(checkpoint_dir=config.OUTPUT_LOGS,
