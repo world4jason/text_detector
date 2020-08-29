@@ -1,6 +1,5 @@
 import tensorflow as tf
-import random, cv2
-import numpy as np
+
 
 def tf_summary_image(image, boxes, name='image'):
     """Add image with bounding boxes to summary.
@@ -9,6 +8,7 @@ def tf_summary_image(image, boxes, name='image'):
     boxes = tf.expand_dims(boxes, 0)
     image_with_box = tf.image.draw_bounding_boxes(image, boxes)
     tf.summary.image(name, image_with_box)
+
 
 def normalize_image(image, mean=(0.485, 0.456, 0.406), var=(0.229, 0.224, 0.225)):
     """Normalizes pixel values in the image.
@@ -31,12 +31,14 @@ def normalize_image(image, mean=(0.485, 0.456, 0.406), var=(0.229, 0.224, 0.225)
 
 
 def resize_image_and_boxes(image, boxes, input_size,
-                 method=tf.image.ResizeMethod.BILINEAR):
+                           method=tf.image.ResizeMethod.BILINEAR):
     with tf.name_scope('ResizeImage', values=[image, input_size, method]):
-        image_resize = tf.image.resize_images(image, [input_size, input_size], method=method)
+        image_resize = tf.image.resize_images(
+            image, [input_size, input_size], method=method)
         boxes_resize = boxes * input_size
 
         return image_resize, boxes_resize
+
 
 def random_horizontal_flip(image, boxes, seed=None):
     """Randomly decides whether to horizontally mirror the image and detections or not.
@@ -63,7 +65,6 @@ def random_horizontal_flip(image, boxes, seed=None):
         # flip image
         image_flipped = tf.image.flip_left_right(image)
         return image_flipped
-
 
     def _flip_boxes_horizontally(boxes):
         """Left-right flip the boxes.
@@ -97,14 +98,15 @@ def random_horizontal_flip(image, boxes, seed=None):
             tf.greater(tf.size(boxes), 0), tf.greater(do_a_flip_random, 0.5))
 
         # flip image
-        image = tf.cond(do_a_flip_random, lambda: _flip_image(image), lambda: image)
+        image = tf.cond(do_a_flip_random,
+                        lambda: _flip_image(image), lambda: image)
 
         # flip boxes
         if boxes is not None:
             boxes = tf.cond(
-              do_a_flip_random, lambda: _flip_boxes_horizontally(boxes), lambda: boxes)
+                do_a_flip_random, lambda: _flip_boxes_horizontally(boxes), lambda: boxes)
 
-        return image,boxes
+        return image, boxes
 
 
 def random_vertical_flip(image, boxes, seed=None):
@@ -132,7 +134,6 @@ def random_vertical_flip(image, boxes, seed=None):
         # flip image
         image_flipped = tf.image.flip_up_down(image)
         return image_flipped
-
 
     def _flip_boxes_vertically(boxes):
         """Up-dowon flip the boxes.
@@ -166,14 +167,16 @@ def random_vertical_flip(image, boxes, seed=None):
             tf.greater(tf.size(boxes), 0), tf.greater(do_a_flip_random, 0.5))
 
         # flip image
-        image = tf.cond(do_a_flip_random, lambda: _flip_image(image), lambda: image)
+        image = tf.cond(do_a_flip_random,
+                        lambda: _flip_image(image), lambda: image)
 
         # flip boxes
         if boxes is not None:
             boxes = tf.cond(
-              do_a_flip_random, lambda: _flip_boxes_vertically(boxes), lambda: boxes)
+                do_a_flip_random, lambda: _flip_boxes_vertically(boxes), lambda: boxes)
 
         return image, boxes
+
 
 def random_pixel_value_scale(image, minval=0.9, maxval=1.1, seed=None):
     """Scales each value in the pixels of the image.
@@ -200,6 +203,7 @@ def random_pixel_value_scale(image, minval=0.9, maxval=1.1, seed=None):
         image = tf.clip_by_value(image, 0.0, 1.0)
 
         return image
+
 
 def random_image_scale(image,
                        masks=None,
@@ -238,7 +242,7 @@ def random_image_scale(image,
         result.append(image)
         if masks:
             masks = tf.image.resize_nearest_neighbor(
-              masks, [image_newysize, image_newxsize], align_corners=True)
+                masks, [image_newysize, image_newxsize], align_corners=True)
             result.append(masks)
         return tuple(result)
 
@@ -257,12 +261,15 @@ def random_adjust_brightness(image, max_delta=32. / 255.):
     def _random_adjust_brightness(image, max_delta):
         with tf.name_scope('RandomAdjustBrightness', values=[image]):
             image = tf.image.random_brightness(image, max_delta)
-            image = tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0)
+            image = tf.clip_by_value(
+                image, clip_value_min=0.0, clip_value_max=1.0)
             return image
 
     do_random = tf.greater(tf.random_uniform([]), 0.90)
-    image = tf.cond(do_random, lambda: _random_adjust_brightness(image, max_delta), lambda: image)
+    image = tf.cond(do_random, lambda: _random_adjust_brightness(
+        image, max_delta), lambda: image)
     return image
+
 
 def random_adjust_contrast(image, min_delta=0.5, max_delta=1.25):
     """Randomly adjusts contrast.
@@ -280,12 +287,15 @@ def random_adjust_contrast(image, min_delta=0.5, max_delta=1.25):
     def _random_adjust_contrast(image, min_delta, max_delta):
         with tf.name_scope('RandomAdjustContrast', values=[image]):
             image = tf.image.random_contrast(image, min_delta, max_delta)
-            image = tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0)
+            image = tf.clip_by_value(
+                image, clip_value_min=0.0, clip_value_max=1.0)
             return image
 
     do_random = tf.greater(tf.random_uniform([]), 0.90)
-    image = tf.cond(do_random, lambda: _random_adjust_contrast(image, min_delta, max_delta), lambda: image)
+    image = tf.cond(do_random, lambda: _random_adjust_contrast(
+        image, min_delta, max_delta), lambda: image)
     return image
+
 
 def random_adjust_hue(image, max_delta=0.02):
     """Randomly adjusts hue.
@@ -300,11 +310,13 @@ def random_adjust_hue(image, max_delta=0.02):
     def _random_adjust_hue(image, max_delta):
         with tf.name_scope('RandomAdjustHue', values=[image]):
             image = tf.image.random_hue(image, max_delta)
-            image = tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0)
+            image = tf.clip_by_value(
+                image, clip_value_min=0.0, clip_value_max=1.0)
             return image
 
     do_random = tf.greater(tf.random_uniform([]), 0.90)
-    image = tf.cond(do_random, lambda: _random_adjust_hue(image, max_delta), lambda: image)
+    image = tf.cond(do_random, lambda: _random_adjust_hue(
+        image, max_delta), lambda: image)
     return image
 
 
@@ -324,11 +336,13 @@ def random_adjust_saturation(image, min_delta=0.5, max_delta=1.25):
     def _random_adjust_saturation(image, min_delta, max_delta):
         with tf.name_scope('RandomAdjustSaturation', values=[image]):
             image = tf.image.random_saturation(image, min_delta, max_delta)
-            image = tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0)
+            image = tf.clip_by_value(
+                image, clip_value_min=0.0, clip_value_max=1.0)
             return image
 
     do_random = tf.greater(tf.random_uniform([]), 0.90)
-    image = tf.cond(do_random, lambda: _random_adjust_saturation(image, min_delta, max_delta), lambda: image)
+    image = tf.cond(do_random, lambda: _random_adjust_saturation(
+        image, min_delta, max_delta), lambda: image)
     return image
 
 
